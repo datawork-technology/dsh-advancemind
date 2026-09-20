@@ -19,6 +19,12 @@ import {
 
 const MAX_STATE_BYTES = 4 * 1024
 
+/** Inert tray handle used when updates are switched off for this build. */
+const NOOP_TRAY_REGISTRATION: DesktopTrayItemRegistration = Object.freeze({
+  refresh: () => {},
+  dispose: () => {},
+})
+
 /** Validated scheduling and request policy for one update lifecycle. */
 export interface DesktopUpdatePolicy {
   readonly enabled: boolean
@@ -82,6 +88,13 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
 
   constructor(private readonly options: DesktopUpdateLifecycleOptions) {
     this.stateReady = this.loadState()
+    if (!options.policy.enabled) {
+      // Updates are switched off for this build, so register nothing, poll nothing,
+      // and let every interactive check resolve without touching the network.
+      this.registration = NOOP_TRAY_REGISTRATION
+      this.stableRegistration = undefined
+      return
+    }
     this.registration = options.registerTrayItem({
       id: 'check-for-updates',
       group: 'status',
@@ -282,6 +295,7 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
   }
 
   private runManualCheck(): Promise<void> {
+    if (!this.options.policy.enabled) return Promise.resolve()
     this.manualTask ??= (async () => {
       if (this.availableVersion !== undefined) {
         await this.offerDownload(this.availableVersion)
@@ -359,8 +373,8 @@ function parseState(text: string): ParsedUpdateState {
 
 function updateAvailableNotification(locale: DesktopLocale, version: string): DesktopNotification {
   return locale === 'zh'
-    ? { title: 'DSH Desktop 有可用更新', body: `版本 ${version} 已可下载。打开 DSH Desktop 即可继续。` }
-    : { title: 'DSH Desktop Update Available', body: `Version ${version} is ready to download. Open DSH Desktop to continue.` }
+    ? { title: 'AdvanceMind 有可用更新', body: `版本 ${version} 已可下载。打开 AdvanceMind 即可继续。` }
+    : { title: 'AdvanceMind Update Available', body: `Version ${version} is ready to download. Open AdvanceMind to continue.` }
 }
 
 async function readState(filename: string): Promise<string> {

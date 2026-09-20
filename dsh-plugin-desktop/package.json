@@ -327,8 +327,8 @@
     "vitest": "4.1.8"
   },
   "build": {
-    "appId": "ai.deepseek.dsh.desktop",
-    "productName": "DSH Desktop",
+    "appId": "com.datawork-technology.dsh-advancemind",
+    "productName": "AdvanceMind",
     "asar": false,
     "afterPack": "./scripts/verify-packaged-runtime.ts",
     "afterAllArtifactBuild": "./scripts/verify-electron-fuses.ts",

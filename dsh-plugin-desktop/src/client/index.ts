@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
+import { applyAdvanceMindBrand } from './brand.tsx'
 import { startRendererBootReporter } from './boot-health.ts'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
@@ -18,6 +19,13 @@ import { installSidebarFooterStyles } from './sidebar-footer-styles.ts'
 import { desktopWindowService, provideDesktopWindow } from './window-service.ts'
 
 export { applyAdvancedShell } from './advanced-shell.ts'
+export {
+  ADVANCEMIND_BRAND_COLOR,
+  ADVANCEMIND_NAME,
+  AdvanceMindMark,
+  AdvanceMindName,
+  applyAdvanceMindBrand,
+} from './brand.tsx'
 export { applyDesktopSettings } from './desktop-settings.ts'
 export { applyExtendedShell, applyFramedShell } from './extended-shell.ts'
 export {
@@ -95,6 +103,7 @@ export function apply(ctx: ClientContext): void {
     () => installSidebarFooterStyles(),
     'dsh-plugin-desktop: sidebar footer stacking styles',
   )
+  applyAdvanceMindBrand(ctx)
   ctx.effect(
     () => startRendererBootReporter(ctx.loader),
     'dsh-plugin-desktop: renderer boot health report',

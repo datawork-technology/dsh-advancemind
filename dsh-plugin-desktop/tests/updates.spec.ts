@@ -125,12 +125,15 @@ async function createHarness(options: {
     },
   } as unknown as Context
 
-  apply(ctx, options.config ?? testConfig)
-  if (tray === undefined) throw new Error('Update tray item was not registered.')
+  const effectiveConfig = options.config ?? testConfig
+  apply(ctx, effectiveConfig)
+  if (effectiveConfig.enabled && tray === undefined) {
+    throw new Error('Update tray item was not registered.')
+  }
   if (route === undefined) throw new Error('Update route was not registered.')
   return {
     statePath,
-    tray,
+    tray: tray as DesktopTrayItem,
     trays,
     notifications,
     warnings,
@@ -184,7 +187,7 @@ describe('desktop update Host plugin', () => {
   it('exposes the packaged 60-second and six-hour background policy', () => {
     expect(inject).toEqual(['desktopRuntime', 'webServer', 'connection'])
     expect(Config({} as UpdateConfig)).toEqual({
-      enabled: true,
+      enabled: false,
       initialDelayMs: 60_000,
       intervalMs: 21_600_000,
       requestTimeoutMs: 15_000,
@@ -260,16 +263,13 @@ describe('desktop update Host plugin', () => {
     await harness.dispose()
   })
 
-  it.each([
-    { packaged: false, enabled: true },
-    { packaged: true, enabled: false },
-  ])('reports a manual up-to-date result while automatic polling is disabled: %#', async ({ packaged, enabled }) => {
+  it('reports a manual up-to-date result while automatic polling is disabled', async () => {
     vi.useFakeTimers()
     const request = vi.fn(async () => versionResponse('2.0.0'))
     const harness = await createHarness({
-      packaged,
+      packaged: false,
       request,
-      config: { ...testConfig, enabled },
+      config: { ...testConfig, enabled: true },
     })
 
     await vi.advanceTimersByTimeAsync(testConfig.intervalMs)
@@ -286,6 +286,46 @@ describe('desktop update Host plugin', () => {
     expect(harness.downloadAndOpen).not.toHaveBeenCalled()
     expect(harness.notifications).toEqual([])
     expect(harness.warnings).toEqual([])
+  })
+
+  it('leaves every update path off when the policy is disabled', async () => {
+    vi.useFakeTimers()
+    const request = vi.fn(async () => versionResponse('9.9.9'))
+    const harness = await createHarness({
+      packaged: true,
+      request,
+      config: { ...testConfig, enabled: false },
+    })
+
+    expect(harness.trays).toEqual([])
+    await vi.advanceTimersByTimeAsync(testConfig.initialDelayMs + testConfig.intervalMs)
+    expect(request).not.toHaveBeenCalled()
+
+    const req = {
+      method: 'POST',
+      headers: {
+        host: '127.0.0.1:43120',
+        origin: 'http://127.0.0.1:43120',
+        'content-type': 'application/json',
+      },
+      socket: { remoteAddress: '127.0.0.1' },
+      async * [Symbol.asyncIterator]() { yield Buffer.from('{}') },
+    } as unknown as IncomingMessage
+    let body = ''
+    const res = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      end: vi.fn((value?: string) => { body = value ?? '' }),
+    } as unknown as ServerResponse
+
+    await harness.route.handler(req, res)
+
+    expect(request).not.toHaveBeenCalled()
+    expect(harness.showManualCheckResult).not.toHaveBeenCalled()
+    expect(harness.notifications).toEqual([])
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(body)).toEqual({ accepted: true })
+    await harness.dispose()
   })
 
   it('announces a background update once without opening a confirmation dialog', async () => {

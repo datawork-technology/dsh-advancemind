@@ -19,6 +19,14 @@
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
 
+# AdvanceMind occupies the generic sidebar brand slots from its own client face.
+# The upstream occupants must not register first: single-occupancy cells throw on
+# a second registration at the same priority, and the sidebar's own fallback is
+# the upstream mark. This layer is applied immediately after the Web bundle, so
+# the id resolves.
+- id: ui-brand-official
+  disabled: true
+
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime
   config:

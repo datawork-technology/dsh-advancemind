@@ -1,4 +1,4 @@
-/** Cordis Host plugin for scheduled and interactive DSH Desktop updates. */
+/** Cordis Host plugin for scheduled and interactive AdvanceMind updates. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -31,7 +31,10 @@ export interface Config {
 
 /** Validated scheduled update policy. */
 export const Config: z<Config> = z.object({
-  enabled: z.boolean().default(true),
+  // AdvanceMindAdvance is a renamed fork. The upstream release service only
+  // serves the original AdvanceMind, so any update it offered would replace this
+  // build. Updates are therefore off unless a profile explicitly turns them on.
+  enabled: z.boolean().default(false),
   initialDelayMs: z.number().step(1).min(0).max(MAX_TIMER_DELAY_MS).default(60_000),
   intervalMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(6 * 60 * 60 * 1000),
   requestTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(15_000),

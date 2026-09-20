@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="advancemind-tile" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#4338CA"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#advancemind-tile)"/>
+  <g transform="translate(512 512) scale(25.5) translate(-12 -12)">
+    <path fill="#FFFFFF" fill-rule="evenodd" clip-rule="evenodd" d="M12 2.2 22.4 21.8 17.7 21.8 15.7 17.9 8.3 17.9 6.3 21.8 1.6 21.8ZM12 9.4 9.9 13.6 14.1 13.6Z"/>
+  </g>
+</svg>
