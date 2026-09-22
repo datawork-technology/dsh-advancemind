@@ -33,7 +33,8 @@
       "types": "./lib/contracts/index.d.ts",
       "default": "./lib/contracts/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
   },
   "dsh": {
     "client": {
@@ -45,9 +46,13 @@
         "@deepseek-ai/dsh-client-ui-sidebar"
       ],
       "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
   "files": [
+    "cordis.patch.yml",
     "docs/**",
     "lib/**",
     "LICENSE",
@@ -62,7 +67,7 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && yarn run generate:types && tsdown && tsc -p tsconfig.json && tsc -p tsconfig.client.json --emitDeclarationOnly",
+    "build": "node scripts/clean.mjs && yarn run generate:types && tsdown && tsc -p tsconfig.json && tsc -p tsconfig.client.json --emitDeclarationOnly && node scripts/verify-client-externals.mjs",
     "generate:types": "node scripts/generate-contract-types.mjs",
     "typecheck": "node scripts/generate-contract-types.mjs --check && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run",

@@ -182,6 +182,7 @@ const electron = vi.hoisted(() => {
     readonly restore = vi.fn()
     readonly show = vi.fn()
     readonly hide = vi.fn()
+    readonly minimize = vi.fn()
     readonly focus = vi.fn()
     readonly on = browserWindowOn
     readonly off = browserWindowOff
@@ -261,7 +262,7 @@ const electron = vi.hoisted(() => {
     Menu: {
       buildFromTemplate: vi.fn((template: unknown[]) => {
         const first = template[0] as { label?: unknown, submenu?: unknown } | undefined
-        if (first?.label === 'DSH Desktop' && Array.isArray(first.submenu)) {
+        if (first?.label === 'AdvanceMind' && Array.isArray(first.submenu)) {
           applicationMenuTemplates.push(template)
         } else {
           menuTemplates.push(template)
@@ -339,7 +340,7 @@ const spec: DesktopShellSpec = {
     name: 'x-dsh-desktop-renderer',
     value: Buffer.alloc(32, 9).toString('base64url'),
   },
-  productName: 'DSH Desktop',
+  productName: 'AdvanceMind',
   windowTitle: 'DeepSeek Harness Desktop',
   iconPath: '/tmp/app-icon.png',
   trayIcons: {
@@ -446,7 +447,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.browserWindows[0]?.removeMenu).not.toHaveBeenCalled()
     expect(electron.app.dock.setIcon).toHaveBeenCalledWith(electron.appIcon)
     expect(electron.applicationMenuTemplates[0]?.map(item => (item as { label?: string }).label)).toEqual([
-      'DSH Desktop', '文件', '编辑', '显示', '窗口',
+      'AdvanceMind', '文件', '编辑', '显示', '窗口',
     ])
     expect(electron.Menu.setApplicationMenu).toHaveBeenCalledWith({
       template: electron.applicationMenuTemplates[0],
@@ -871,6 +872,73 @@ describe('Electron desktop runtime', () => {
     expect(logger.error).toHaveBeenCalledWith('dsh-plugin-desktop: workspace volume decision=confirmed path=E:\\repo')
   })
 
+  it('offers restart first when the supervised Host is gone, and names the exit code', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const restart = vi.fn(async () => {})
+    const runtime = new ElectronDesktopRuntime(restart)
+
+    await runtime.showHostStoppedRecovery({ exitCode: 0 })
+
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'error',
+      buttons: ['Restart AdvanceMind', 'Open DSH Terminal', 'Dismiss'],
+      defaultId: 0,
+      cancelId: 2,
+      detail: expect.stringContaining('0 / 0x00000000'),
+    }))
+    // Response 0 walks the existing restart confirmation before relaunching.
+    expect(restart).toHaveBeenCalledOnce()
+  })
+
+  it('opens the terminal instead of restarting when the reader wants the logs first', async () => {
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 1, checkboxChecked: false })
+    Object.defineProperty(process.versions, 'electron', { configurable: true, value: '43.4.0' })
+    try {
+      const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+      const restart = vi.fn(async () => {})
+      const runtime = new ElectronDesktopRuntime(restart)
+      const userDataPath = electron.app.getPath('userData')
+      runtime.configureTerminal({
+        profileName: 'desktop',
+        profileDir: join(userDataPath, 'profiles', 'desktop'),
+        homeDir: userDataPath,
+      })
+
+      await runtime.showHostStoppedRecovery({ exitCode: 3 })
+
+      expect(terminal.open).toHaveBeenCalledOnce()
+      expect(restart).not.toHaveBeenCalled()
+    } finally {
+      delete (process.versions as { electron?: string }).electron
+    }
+  })
+
+  it('shows one Host recovery dialog no matter how many failures land on it', async () => {
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 2, checkboxChecked: false })
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const restart = vi.fn(async () => {})
+    const runtime = new ElectronDesktopRuntime(restart)
+
+    await Promise.all([
+      runtime.showHostStoppedRecovery({ exitCode: 0 }),
+      runtime.showHostStoppedRecovery({ exitCode: 0 }),
+      runtime.showHostStoppedRecovery({ exitCode: 0 }),
+    ])
+
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledOnce()
+    expect(restart).not.toHaveBeenCalled()
+  })
+
+  it('stays silent about a Host exit that is part of quitting', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+
+    runtime.prepareToQuit()
+    await runtime.showHostStoppedRecovery({ exitCode: 0 })
+
+    expect(electron.dialog.showMessageBox).not.toHaveBeenCalled()
+  })
+
   it('logs renderer crashes with the Windows exception code', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -1286,7 +1354,7 @@ describe('Electron desktop runtime', () => {
     expect(runtime.locale).toBe('zh')
     expect((electron.menuTemplates.at(-1) as Array<{ label?: string }>).map(item => item.label))
       .toEqual(expect.arrayContaining([
-        '打开 DSH Desktop',
+        '打开 AdvanceMind',
         '模式：兼容模式',
         '退出',
       ]))
@@ -1295,7 +1363,7 @@ describe('Electron desktop runtime', () => {
     expect(runtime.locale).toBe('en')
     expect((electron.menuTemplates.at(-1) as Array<{ label?: string }>).map(item => item.label))
       .toEqual(expect.arrayContaining([
-        'Open DSH Desktop',
+        'Open AdvanceMind',
         'Mode: Compatibility Mode',
         'Quit',
       ]))
@@ -1305,7 +1373,7 @@ describe('Electron desktop runtime', () => {
     expect(runtime.locale).toBe('zh')
     expect((electron.menuTemplates.at(-1) as Array<{ label?: string }>).map(item => item.label))
       .toEqual(expect.arrayContaining([
-        '打开 DSH Desktop',
+        '打开 AdvanceMind',
         '模式：兼容模式',
         '退出',
       ]))
@@ -1507,6 +1575,36 @@ describe('Electron desktop runtime', () => {
     close(quittingCloseEvent)
     expect(quittingCloseEvent.preventDefault).not.toHaveBeenCalled()
     expect(window?.hide).toHaveBeenCalledOnce()
+
+    await release()
+  })
+
+  // `new Tray()` succeeds on Linux desktops that render no status area at all,
+  // so hiding the window there can strand a running Host with no way back.
+  it('minimizes instead of hiding when a Linux window is closed', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+
+    await runtime.mountScheduled()
+
+    const window = electron.browserWindows[0]
+    const close = electron.browserWindowOn.mock.calls.find(([event]) => event === 'close')?.[1]
+    expect(close).toEqual(expect.any(Function))
+
+    const closeEvent = { preventDefault: vi.fn() }
+    close(closeEvent)
+    expect(closeEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(window?.minimize).toHaveBeenCalledOnce()
+    expect(window?.hide).not.toHaveBeenCalled()
+
+    // Quitting still tears the window down instead of leaving it minimized.
+    runtime.prepareToQuit()
+    const quittingCloseEvent = { preventDefault: vi.fn() }
+    close(quittingCloseEvent)
+    expect(quittingCloseEvent.preventDefault).not.toHaveBeenCalled()
+    expect(window?.minimize).toHaveBeenCalledOnce()
 
     await release()
   })
@@ -1875,7 +1973,7 @@ describe('Electron desktop runtime', () => {
 
     const labels = (electron.menuTemplates.at(-1) as Array<{ label?: string }>).map(item => item.label)
     expect(labels).toEqual([
-      'Open DSH Desktop', 'Reload Interface', undefined,
+      'Open AdvanceMind', 'Reload Interface', undefined,
       'Earlier Tool', 'Later Tool', undefined,
       'Check for Updates…', undefined,
       'Mode: Compatibility Mode', undefined,
@@ -1936,7 +2034,7 @@ describe('Electron desktop runtime', () => {
     const application = (electron.applicationMenuTemplates.at(-1) as Array<{
       label?: string
       submenu?: Array<{ label?: string, submenu?: unknown }>
-    }>).find(item => item.label === 'DSH Desktop')
+    }>).find(item => item.label === 'AdvanceMind')
     expect(application?.submenu).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'Profile: desktop' }),
     ]))
@@ -2136,7 +2234,7 @@ describe('Electron desktop runtime', () => {
       title: 'Plugin Load Failed',
       message: 'Some plugins could not be loaded.',
       detail: expect.stringContaining('dsh-vision-router'),
-      buttons: ['Open DSH Terminal', 'Restart DSH Desktop', 'Dismiss'],
+      buttons: ['Open DSH Terminal', 'Restart AdvanceMind', 'Dismiss'],
     }))
     const recoveryCalls = electron.dialog.showMessageBox.mock.calls as unknown as Array<[{ detail?: string }]>
     expect(recoveryCalls[0]?.[0].detail).toContain('vision_crop')
@@ -2232,7 +2330,7 @@ describe('Electron desktop runtime', () => {
 
     expect(restart).not.toHaveBeenCalled()
     expect(electron.dialog.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'question', title: 'Restart DSH Desktop', buttons: ['Restart', 'Cancel'], defaultId: 1, cancelId: 1,
+      type: 'question', title: 'Restart AdvanceMind', buttons: ['Restart', 'Cancel'], defaultId: 1, cancelId: 1,
     }))
 
     electron.dialog.showMessageBox.mockResolvedValueOnce({ response: 0, checkboxChecked: false })
@@ -2406,7 +2504,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(
       activeWindow,
       expect.objectContaining({
-        title: 'DSH Desktop Is Up to Date',
+        title: 'AdvanceMind Is Up to Date',
         detail: 'Installed version: 2.0.0',
         buttons: ['OK'],
       }),
@@ -2456,7 +2554,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(
       activeWindow,
       expect.objectContaining({
-        title: 'DSH Desktop Update Downloaded',
+        title: 'AdvanceMind Update Downloaded',
         buttons: ['OK'],
       }),
     )
